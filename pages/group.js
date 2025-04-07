@@ -1,4 +1,7 @@
 // pages/group.js
+
+
+
 import Navbar from "../components/Navbar";
 
 import { useState } from 'react';
@@ -10,6 +13,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 export default function GroupPage() {
   const [groupId, setGroupId] = useState('');
   const [user, setUser] = useState(null);
+  
 
   // ログイン状態の取得
   onAuthStateChanged(auth, (currentUser) => {
@@ -41,12 +45,26 @@ export default function GroupPage() {
       </button>
 
       {groupId && (
-        <div className="mt-4">
-          <p className="text-lg">あなたのグループID:</p>
-          <p className="font-mono text-xl text-green-600">{groupId}</p>
-          <p className="text-sm text-gray-500 mt-2">このIDを知り合いに共有してください</p>
-        </div>
-      )}
+  <div className="mt-4">
+    <p className="text-lg">あなたのグループID:</p>
+    <div className="flex items-center gap-2 mt-1">
+      <p className="font-mono text-xl text-green-600">{groupId}</p>
+      <button
+        onClick={async () => {
+          await navigator.clipboard.writeText(groupId);
+          alert("グループIDをコピーしました！");
+        }}
+        className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600"
+      >
+        コピー
+      </button>
+    </div>
+    <p className="text-sm text-gray-500 mt-2">
+      このIDを知り合いに共有してください
+    </p>
+  </div>
+)}
+
     </div>
   );
 }

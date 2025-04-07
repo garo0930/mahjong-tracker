@@ -23,9 +23,6 @@ export default function Home() {
           <Link href="/graph" className="block bg-yellow-500 text-white py-3 rounded shadow hover:bg-yellow-600">
             📈 収支グラフ
           </Link>
-          <Link href="/cumulative" className="block bg-pink-500 text-white py-3 rounded shadow hover:bg-pink-600">
-            📈 累積収支
-          </Link>
           <Link href="/group" className="block bg-indigo-500 text-white py-3 rounded shadow hover:bg-indigo-600">
             ➕ グループ作成
           </Link>

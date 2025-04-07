@@ -1,51 +1,43 @@
-// pages/group-status.js
+import { useState, useEffect } from "react";
 import Navbar from "../components/Navbar";
 
-import { useState, useEffect } from "react";
-import { auth, db } from "../firebase";
-import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
-
-export default function GroupStatusPage() {
-  const [groupId, setGroupId] = useState('');
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+export default function GroupStatus() {
+  const [groupId, setGroupId] = useState("");
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (currentUser) {
-        setUser(currentUser);
-        const userDocRef = doc(db, "users", currentUser.uid);
-        const userDoc = await getDoc(userDocRef);
-
-        if (userDoc.exists()) {
-          const data = userDoc.data();
-          setGroupId(data.groupId || '');
-        }
-      }
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
+    const saved = localStorage.getItem("groupId") || "";
+    setGroupId(saved);
   }, []);
 
-  if (loading) return <p className="p-4">読み込み中...</p>;
+  const handleCopy = async () => {
+    if (!groupId) return;
+    try {
+      await navigator.clipboard.writeText(groupId);
+      alert("グループIDをコピーしました！");
+    } catch (err) {
+      alert("コピーに失敗しました");
+    }
+  };
 
   return (
-    <div className="p-6">
+    <div className="p-4">
       <Navbar />
-      <h1 className="text-2xl font-bold mb-4">📛 所属グループの確認</h1>
+      <h1 className="text-2xl font-bold mb-4">所属グループの確認</h1>
 
-      {user ? (
-        <div className="text-lg">
-          <p>ユーザー名：{user.displayName}</p>
-          <p className="mt-2">
-            所属グループID：<span className="font-mono text-green-600">{groupId || '未登録'}</span>
-          </p>
+      <div className="bg-gray-100 p-4 rounded shadow mb-6">
+        <h2 className="text-lg font-semibold mb-2">現在のグループID</h2>
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-blue-600">{groupId}</span>
+          <button
+            onClick={handleCopy}
+            className="bg-blue-500 text-white px-3 py-1 rounded"
+          >
+            コピー
+          </button>
         </div>
-      ) : (
-        <p>ログインしていません。</p>
-      )}
+      </div>
+
+      {/* ここに他のグループ情報や機能を追加してもOK！ */}
     </div>
   );
 }

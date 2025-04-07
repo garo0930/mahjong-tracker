@@ -80,51 +80,54 @@ useEffect(() => {
     }));
   };
 
-  const calculateRankingsAndEarnings = () => {
+  const calculateRankingsAndPointDiffs = () => {
     const scoreEntries = Object.entries(scores).map(([pid, val]) => ({
       playerId: pid,
       score: Number(val)
     }));
-
-    // 順位を点数の高い順で決定
+  
     const rankings = [...scoreEntries]
       .sort((a, b) => b.score - a.score)
       .map((entry, index) => ({
         ...entry,
         rank: index + 1
       }));
-
-    // 収支を計算（1位 +2、2位 0、3位 -1、4位 -1 とする例）
-    const earnings = {};
+  
+    // ✅ 平均ではなく、基準値（中央値）を固定
+    const baseScore = 2.5; // 1位との差が常に3ptになるように
+  
+    const pointDiffs = {};
     rankings.forEach((entry) => {
-      let rateDiff = 0;
-      if (entry.rank === 1) rateDiff = 2;
-      else if (entry.rank === 2) rateDiff = 0;
-      else rateDiff = -1;
-      earnings[entry.playerId] = rateDiff * rateValue;
+      const diff = baseScore - entry.rank;
+      pointDiffs[entry.playerId] = diff;
     });
-
-    return { rankings, earnings };
+  
+    return { rankings, pointDiffs };
   };
+  
+  
 
   const handleAddGame = async () => {
     if (!date) return;
-
-    const { rankings, earnings } = calculateRankingsAndEarnings();
-
+  
+    // ✅ 順位と順位差を計算
+    const { rankings, pointDiffs } = calculateRankingsAndPointDiffs();
+  
+    // ✅ Firebase に保存するゲームデータ
     const newGame = {
       date,
       scores,
       rankings,
-      earnings,
+      pointDiffs, // ← これでOK！
       groupId: groupId,
     };
-
+  
     const docRef = await addDoc(collection(db, 'games'), newGame);
     setGames([...games, { id: docRef.id, ...newGame }]);
     setDate('');
     setScores({});
   };
+  
 
   return (
     <RequireAuth>
@@ -155,12 +158,14 @@ useEffect(() => {
     <div key={player.id} className="flex flex-col sm:flex-row sm:items-center gap-2">
       <span className="w-full sm:w-32">{player.name}</span>
       <input
-        type="number"
-        placeholder="点数"
-        value={scores[player.id] || ''}
-        onChange={(e) => handleScoreChange(player.id, e.target.value)}
-        className="border px-2 py-1 w-full sm:w-auto"
-      />
+  type="number"
+  placeholder="点数"
+  value={scores[player.id] ?? 25000} // ← 初期値 25000
+  onChange={(e) => handleScoreChange(player.id, e.target.value)}
+  step={100} // ← 矢印の単位を100点に
+  className="border px-2 py-1 w-full sm:w-auto"
+/>
+
     </div>
   ))}
 </div>
@@ -187,17 +192,22 @@ useEffect(() => {
           </div>
         
           <ul className="ml-4 mt-2">
-            {Object.entries(game.scores).map(([pid, score]) => {
-              const player = players.find(p => p.id === pid);
-              return (
-                <li key={pid} className="text-sm">
-                  {player?.name || '不明'}：{score}点 ／ 順位：
-                  {game.rankings?.find(r => r.playerId === pid)?.rank || '-'} ／ 収支：
-                  {game.earnings?.[pid] ?? 0}円
-                </li>
-              );
-            })}
-          </ul>
+  {Object.entries(game.scores).map(([pid, score]) => {
+    const player = players.find(p => p.id === pid);
+    const rank = game.rankings?.find(r => r.playerId === pid)?.rank || '-';
+    const pt = game.pointDiffs?.[pid] ?? 0;
+    const baseScore = 25000; // ← 固定スタート点
+    const rawScore = Number(score);
+    const soten = ((rawScore - baseScore) / 1000).toFixed(1); // ← 素点計算
+
+    return (
+      <li key={pid} className="text-sm">
+        {player?.name || '不明'}：{score}点 ／ 順位：{rank} ／ 順位差：{pt} pt ／ 素点：{soten}
+      </li>
+    );
+  })}
+</ul>
+
         </li>
         ))}
       </ul>
