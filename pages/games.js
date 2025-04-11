@@ -20,7 +20,10 @@ export default function Games() {
   const [players, setPlayers] = useState([]);
   const [games, setGames] = useState([]);
   const [scores, setScores] = useState({});
-  const [date, setDate] = useState('');
+  const [date, setDate] = useState(() => {
+    const today = new Date(); // 今日の日付を取得
+    return today.toISOString().split('T')[0]; // "YYYY-MM-DD" の形式に変換
+  });
   const [rateValue, setRateValue] = useState(300); // 1レート = 300円
   const [userId, setUserId] = useState(null);
   const [groupId, setGroupId] = useState(() => {
