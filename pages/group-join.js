@@ -1,84 +1,65 @@
 // pages/group-join.js
+import { useEffect, useState } from "react";
+import { db } from "../firebase";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
 import Navbar from "../components/Navbar";
+import RequireAuth from "../components/RequireAuth";
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/router';
-import { db, auth } from '../firebase';
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  doc,
-  setDoc
-} from 'firebase/firestore';
-import { onAuthStateChanged } from 'firebase/auth';
+export default function GroupJoin() {
+  const [groupId, setGroupId] = useState("");
+  const [message, setMessage] = useState("");
+  const [darkMode, setDarkMode] = useState(false);
+  const [theme, setTheme] = useState("wafu");
 
-export default function JoinGroupPage() {
-  const [inputGroupId, setInputGroupId] = useState('');
-  const [message, setMessage] = useState('');
-  const [user, setUser] = useState(null);
-  const router = useRouter();
+  const themeClassMap = {
+    wafu: "bg-amber-50 text-gray-900",
+    kinzoku: "bg-zinc-900 text-yellow-300",
+    chuka: "bg-yellow-50 text-red-800",
+  };
 
-  // ✅ ログインユーザーを取得
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
-      if (u) setUser(u);
-    });
-    return () => unsubscribe();
+    const storedDark = localStorage.getItem("darkMode");
+    const storedTheme = localStorage.getItem("theme");
+    if (storedDark) setDarkMode(storedDark === "true");
+    if (storedTheme) setTheme(storedTheme);
   }, []);
 
-  const checkGroup = async () => {
-    if (!inputGroupId) {
-      setMessage('グループIDを入力してください');
-      return;
-    }
-
-    // ✅ Firestore でグループの存在チェック
-    const q = query(
-      collection(db, 'groups'),
-      where('groupId', '==', inputGroupId)
-    );
-    const snapshot = await getDocs(q);
-
-    if (!snapshot.empty) {
-      // ✅ ① localStorage に保存
-      localStorage.setItem('groupId', inputGroupId);
-
-      // ✅ ② Firestore の users コレクションに groupId を保存
-      if (user) {
-        await setDoc(doc(db, 'users', user.uid), {
-          groupId: inputGroupId
-        });
-      }
-
-      // ✅ ③ /players に遷移
-      router.push('/players');
+  const handleJoin = async () => {
+    if (!groupId) return;
+    const groupRef = doc(db, "groups", groupId);
+    const snap = await getDoc(groupRef);
+    if (snap.exists()) {
+      localStorage.setItem("groupId", groupId);
+      setMessage("グループに参加しました！");
     } else {
-      setMessage('❌ グループIDが存在しません');
+      setMessage("グループが見つかりません。");
     }
   };
 
   return (
-    <div className="p-6">
-      <Navbar />
-      <h1 className="text-2xl font-bold mb-4">🧑‍🤝‍🧑 グループに参加</h1>
-
-      <input
-        type="text"
-        value={inputGroupId}
-        onChange={(e) => setInputGroupId(e.target.value)}
-        className="border px-4 py-2 rounded w-full sm:w-64"
-        placeholder="グループIDを入力"
-      />
-      <button
-        onClick={checkGroup}
-        className="mt-2 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-      >
-        グループに参加
-      </button>
-
-      {message && <p className="mt-4 text-lg">{message}</p>}
-    </div>
+    <RequireAuth>
+      <div className={darkMode ? "dark" : ""}>
+        <div className={`p-4 min-h-screen ${themeClassMap[theme]} dark:text-white`}>
+          <Navbar />
+          <h1 className="text-2xl font-bold mb-4">グループ参加</h1>
+          <div className="mb-4">
+            <input
+              type="text"
+              value={groupId}
+              onChange={(e) => setGroupId(e.target.value)}
+              placeholder="グループIDを入力"
+              className="border px-2 py-1"
+            />
+            <button
+              onClick={handleJoin}
+              className="ml-2 bg-blue-600 text-white px-4 py-1 rounded"
+            >
+              参加
+            </button>
+          </div>
+          {message && <p className="text-green-600">{message}</p>}
+        </div>
+      </div>
+    </RequireAuth>
   );
 }

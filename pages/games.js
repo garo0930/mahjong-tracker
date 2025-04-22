@@ -1,6 +1,5 @@
 // pages/games.js
 import Navbar from "../components/Navbar";
-
 import { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import {
@@ -10,211 +9,249 @@ import {
   deleteDoc,
   doc
 } from 'firebase/firestore';
-
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../firebase';
-
 import RequireAuth from "../components/RequireAuth";
 
 export default function Games() {
   const [players, setPlayers] = useState([]);
   const [games, setGames] = useState([]);
   const [scores, setScores] = useState({});
-  const [date, setDate] = useState(() => {
-    const today = new Date(); // 今日の日付を取得
-    return today.toISOString().split('T')[0]; // "YYYY-MM-DD" の形式に変換
-  });
-  const [rateValue, setRateValue] = useState(300); // 1レート = 300円
+  const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [rateValue, setRateValue] = useState(300);
   const [userId, setUserId] = useState(null);
-  const [groupId, setGroupId] = useState(() => {
-    // 初回だけ localStorage から groupId を読み取る
-    return typeof window !== 'undefined'
-      ? localStorage.getItem('groupId') || ''
-      : '';
-  });
-  const handleDeleteGame = async (id) => {
-    await deleteDoc(doc(db, 'games', id));
-  
-    const snapshot = await getDocs(collection(db, 'games'));
-    const gameList = snapshot.docs
-      .map(doc => ({ id: doc.id, ...doc.data() }))
-      .filter(game => game.groupId === groupId);
-    setGames(gameList);
-  };
-// ログインユーザー取得
-useEffect(() => {
-  const unsubscribe = onAuthStateChanged(auth, (user) => {
-    if (user) {
-      setUserId(user.uid);
-    }
-  });
-  return () => unsubscribe();
-}, []);
+  const [groupId, setGroupId] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('groupId') || '' : '');
+  const [manuallyEdited, setManuallyEdited] = useState(new Set());
+  const [umaType, setUmaType] = useState("none");
+  const [okaEnabled, setOkaEnabled] = useState(false);
+  const [autoFilledId, setAutoFilledId] = useState(null);
+  const [expandedId, setExpandedId] = useState(null);
+  const [darkMode, setDarkMode] = useState(false);
+  const [theme, setTheme] = useState("wafu");
 
-// プレイヤー＆ゲーム取得
-useEffect(() => {
-  if (!groupId) return;
-
-  const fetchPlayers = async () => {
-    const snapshot = await getDocs(collection(db, 'players'));
-    const playerList = snapshot.docs
-      .map(doc => ({ id: doc.id, ...doc.data() }))
-      .filter(player => player.groupId === groupId);
-    setPlayers(playerList);
+  const themeClassMap = {
+    wafu: "bg-amber-50 text-gray-900",
+    kinzoku: "bg-zinc-900 text-yellow-300",
+    chuka: "bg-yellow-50 text-red-800",
   };
 
-  const fetchGames = async () => {
-    const snapshot = await getDocs(collection(db, 'games'));
-    const gameList = snapshot.docs
-      .map(doc => ({ id: doc.id, ...doc.data() }))
-      .filter(game => game.groupId === groupId);
-    setGames(gameList);
+  const cardClassMap = {
+    wafu: "bg-white border-[3px] border-red-400 rounded-xl shadow-md",
+    kinzoku: "bg-zinc-800 border-[2px] border-yellow-300 rounded-lg shadow-md",
+    chuka: "bg-white border-double border-[4px] border-red-600 rounded-lg shadow-inner",
   };
 
-  fetchPlayers();
-  fetchGames();
-}, [groupId]);
+  useEffect(() => {
+    const saved = localStorage.getItem('darkMode');
+    if (saved) setDarkMode(saved === 'true');
+  }, []);
 
+  useEffect(() => {
+    localStorage.setItem('darkMode', darkMode);
+  }, [darkMode]);
+
+  const toggleDarkMode = () => setDarkMode(prev => !prev);
+
+  const totalPoints = 25000 * 4;
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) setUserId(user.uid);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!groupId) return;
+    const fetchPlayers = async () => {
+      const snapshot = await getDocs(collection(db, 'players'));
+      const playerList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(player => player.groupId === groupId);
+      setPlayers(playerList);
+    };
+    const fetchGames = async () => {
+      const snapshot = await getDocs(collection(db, 'games'));
+      const gameList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(game => game.groupId === groupId);
+      setGames(gameList);
+    };
+    fetchPlayers();
+    fetchGames();
+  }, [groupId]);
 
   const handleScoreChange = (playerId, value) => {
-    setScores(prev => ({
-      ...prev,
-      [playerId]: value
-    }));
-  };
+    const updated = { ...scores, [playerId]: value };
+    const numericEntries = Object.entries(updated).filter(([_, val]) => val !== '' && !isNaN(Number(val)));
+    const filledTotal = numericEntries.reduce((sum, [_, val]) => sum + Number(val), 0);
+    const unfilledPlayers = players.filter(p => updated[p.id] === undefined || updated[p.id] === '' || isNaN(Number(updated[p.id])));
 
-  const calculateRankingsAndPointDiffs = () => {
-    const scoreEntries = Object.entries(scores).map(([pid, val]) => ({
-      playerId: pid,
-      score: Number(val)
-    }));
-  
-    const rankings = [...scoreEntries]
-      .sort((a, b) => b.score - a.score)
-      .map((entry, index) => ({
-        ...entry,
-        rank: index + 1
-      }));
-  
-    // ✅ 平均ではなく、基準値（中央値）を固定
-    const baseScore = 2.5; // 1位との差が常に3ptになるように
-  
-    const pointDiffs = {};
-    rankings.forEach((entry) => {
-      const diff = baseScore - entry.rank;
-      pointDiffs[entry.playerId] = diff;
-    });
-  
-    return { rankings, pointDiffs };
+    if (players.length === 4) {
+      if (unfilledPlayers.length === 1) {
+        const remaining = unfilledPlayers[0];
+        const autoScore = totalPoints - filledTotal;
+        updated[remaining.id] = autoScore;
+        setAutoFilledId(remaining.id);
+      } else if (unfilledPlayers.length === 0 && autoFilledId) {
+        const otherTotal = players.filter(p => p.id !== autoFilledId).reduce((sum, p) => sum + Number(updated[p.id] || 0), 0);
+        updated[autoFilledId] = totalPoints - otherTotal;
+      }
+    }
+    setScores(updated);
   };
-  
-  
 
   const handleAddGame = async () => {
     if (!date) return;
-  
-    // ✅ 順位と順位差を計算
-    const { rankings, pointDiffs } = calculateRankingsAndPointDiffs();
-  
-    // ✅ Firebase に保存するゲームデータ
-    const newGame = {
-      date,
-      scores,
-      rankings,
-      pointDiffs, // ← これでOK！
-      groupId: groupId,
+
+    const calculateRankingsAndPointDiffs = () => {
+      const scoreEntries = Object.entries(scores).map(([pid, val]) => ({ playerId: pid, score: Number(val) }));
+      const rankings = [...scoreEntries].sort((a, b) => b.score - a.score).map((entry, index) => ({ ...entry, rank: index + 1 }));
+
+      const pointDiffs = {};
+      rankings.forEach((entry) => {
+        const diff = 2.5 - entry.rank;
+        pointDiffs[entry.playerId] = diff;
+      });
+
+      const umaValues = {
+        none: [0, 0, 0, 0],
+        "5-10": [10000, 5000, -5000, -10000],
+        "10-20": [20000, 10000, -10000, -20000],
+        "10-30": [30000, 10000, -10000, -30000],
+        "20-30": [30000, 20000, -20000, -30000],
+      };
+      const uma = umaValues[umaType] || [0, 0, 0, 0];
+
+      const rawOkaMap = {};
+      let totalOka = 0;
+      const topPid = rankings[0].playerId;
+
+      rankings.forEach((entry) => {
+        const pid = entry.playerId;
+        const score = entry.score;
+        if (okaEnabled && pid !== topPid) {
+          const diff = (score - 30000) / 1000;
+          const rounded = Math.round(diff * 10) / 10;
+          rawOkaMap[pid] = rounded;
+          totalOka += rounded;
+        }
+      });
+
+      if (okaEnabled) {
+        rawOkaMap[topPid] = -totalOka;
+      }
+
+      const earnings = {};
+      rankings.forEach((entry) => {
+        const pid = entry.playerId;
+        const score = entry.score;
+        const soten = (score - 25000) / 1000;
+        const umaScore = uma[entry.rank - 1] || 0;
+        const oka = rawOkaMap[pid] ?? 0;
+        earnings[pid] = {
+          soten: Number(soten.toFixed(1)),
+          uma: umaScore,
+          oka,
+          total: Math.round(soten * 1000 + umaScore + oka),
+        };
+      });
+
+      return { rankings, pointDiffs, earnings };
     };
-  
+
+    const { rankings, pointDiffs, earnings } = calculateRankingsAndPointDiffs();
+    const newGame = { date, scores, rankings, pointDiffs, earnings, groupId, umaType, oka: okaEnabled };
     const docRef = await addDoc(collection(db, 'games'), newGame);
     setGames([...games, { id: docRef.id, ...newGame }]);
-    setDate('');
     setScores({});
   };
-  
 
   return (
     <RequireAuth>
-    <div className="p-4">
-    <Navbar />
-      <h1 className="text-2xl font-bold mb-4">ゲーム履歴記録</h1>
-      <div className="mb-4">
-  <label className="block mb-1 font-semibold">グループID：</label>
-  <input
-    type="text"
-    value={groupId}
-    onChange={(e) => setGroupId(e.target.value)}
-    className="border px-2 py-1 w-full sm:w-64"
-    placeholder="例：group-abc123"
-  />
-</div>
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 mb-4">
-  <input
-    type="date"
-    value={date}
-    onChange={(e) => setDate(e.target.value)}
-    className="border px-2 py-1 w-full sm:w-auto"
-  />
-</div>
+      <div className={darkMode ? 'dark' : ''}>
+        <div className={`p-4 min-h-screen ${themeClassMap[theme]} dark:text-white`}>
+          <Navbar />
 
-<div className="grid gap-2 mb-4">
-  {players.map((player) => (
-    <div key={player.id} className="flex flex-col sm:flex-row sm:items-center gap-2">
-      <span className="w-full sm:w-32">{player.name}</span>
-      <input
-  type="number"
-  placeholder="点数"
-  value={scores[player.id] ?? 25000} // ← 初期値 25000
-  onChange={(e) => handleScoreChange(player.id, e.target.value)}
-  step={100} // ← 矢印の単位を100点に
-  className="border px-2 py-1 w-full sm:w-auto"
-/>
-
-    </div>
-  ))}
-</div>
-
-<button
-  onClick={handleAddGame}
-  className="bg-green-500 text-white px-4 py-1 rounded"
->
-  保存
-</button>
-
-      <h2 className="text-xl font-bold mt-6 mb-2">履歴</h2>
-      <ul>
-        {games.map((game) => (
-          <li key={game.id} className="mb-4 p-3 bg-white shadow rounded">
-          <div className="flex justify-between items-center">
-            <span>🗓 {game.date}</span>
-            <button
-              onClick={() => handleDeleteGame(game.id)}
-              className="text-red-500"
-            >
-              削除
-            </button>
+          <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
+            <h1 className="text-2xl font-bold">ゲーム履歴記録</h1>
+            <div className="flex gap-2 items-center">
+              <select value={theme} onChange={(e) => setTheme(e.target.value)} className="border px-2 py-1">
+                <option value="wafu">和風</option>
+                <option value="kinzoku">金属</option>
+                <option value="chuka">中華</option>
+              </select>
+              <button onClick={toggleDarkMode} className="px-3 py-1 rounded bg-gray-300 dark:bg-gray-700 text-black dark:text-white">
+                {darkMode ? '🌞 明るく' : '🌙 暗く'}
+              </button>
+            </div>
           </div>
-        
-          <ul className="ml-4 mt-2">
-  {Object.entries(game.scores).map(([pid, score]) => {
-    const player = players.find(p => p.id === pid);
-    const rank = game.rankings?.find(r => r.playerId === pid)?.rank || '-';
-    const pt = game.pointDiffs?.[pid] ?? 0;
-    const baseScore = 25000; // ← 固定スタート点
-    const rawScore = Number(score);
-    const soten = ((rawScore - baseScore) / 1000).toFixed(1); // ← 素点計算
 
-    return (
-      <li key={pid} className="text-sm">
-        {player?.name || '不明'}：{score}点 ／ 順位：{rank} ／ 順位差：{pt} pt ／ 素点：{soten}
-      </li>
-    );
-  })}
-</ul>
+          <input type="text" value={groupId} onChange={(e) => setGroupId(e.target.value)} className="border px-2 py-1 w-full sm:w-64 mb-4" placeholder="例：group-abc123" />
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="border px-2 py-1 mb-4" />
 
-        </li>
-        ))}
-      </ul>
-    </div>
+          <div className="grid gap-2 mb-4">
+            {players.map((player) => (
+              <div key={player.id} className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <span className="w-full sm:w-32 font-mono">{player.name}</span>
+                <input type="number" placeholder="点数" value={scores[player.id] ?? 25000} onChange={(e) => handleScoreChange(player.id, e.target.value)} step={100} className="border px-2 py-1 w-full sm:w-auto" />
+              </div>
+            ))}
+          </div>
+
+          <div className="mb-4">
+            <label className="block font-semibold mb-1">ウマ</label>
+            <select value={umaType} onChange={(e) => setUmaType(e.target.value)} className="border px-2 py-1">
+              <option value="none">なし</option>
+              <option value="5-10">5-10（ゴットー）</option>
+              <option value="10-20">10-20（ワンツー）</option>
+              <option value="10-30">10-30（ワンスリー）</option>
+              <option value="20-30">20-30（ツースリー）</option>
+            </select>
+          </div>
+
+          <div className="mb-4">
+            <label className="inline-flex items-center">
+              <input type="checkbox" className="mr-2" checked={okaEnabled} onChange={(e) => setOkaEnabled(e.target.checked)} />
+              オカ（30000点返し）を適用
+            </label>
+          </div>
+
+          <button onClick={handleAddGame} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1 rounded shadow">
+            保存
+          </button>
+
+          <h2 className="text-xl font-bold mt-6 mb-2">履歴</h2>
+          <ul>
+            {[...games].sort((a, b) => b.date.localeCompare(a.date)).map((game) => (
+              <li key={game.id} className={`mb-4 p-4 ${cardClassMap[theme]}`}>
+                <div className="flex justify-between items-center cursor-pointer" onClick={() => setExpandedId(expandedId === game.id ? null : game.id)}>
+                  <span className="font-semibold">🀄 {game.date}</span>
+                  <span>{expandedId === game.id ? '▲' : '▼'}</span>
+                </div>
+
+                {expandedId === game.id && (
+                  <ul className="ml-4 mt-2">
+                    {Object.entries(game.scores).map(([pid, score]) => {
+                      const player = players.find(p => p.id === pid);
+                      const rank = game.rankings?.find(r => r.playerId === pid)?.rank || '-';
+                      const earning = game.earnings?.[pid] ?? {};
+                      const soten = earning.soten ?? ((Number(score) - 25000) / 1000).toFixed(1);
+                      const uma = earning.uma ?? 0;
+                      const oka = earning.oka ?? 0;
+                      const totalPt = (Number(soten) + uma / 1000 + oka).toFixed(1);
+                      return (
+                        <li key={pid} className="text-sm">
+                          <span className="font-bold">{rank === 1 ? '👑 ' : ''}{player?.name || '不明'}</span>：{score}点 ／ 順位：{rank} <br />
+                          ┗ 素点：{soten} pt ／ ウマ：{(uma / 1000).toFixed(1)} pt ／ オカ：{oka.toFixed(1)} pt → 合計：{totalPt} pt
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+
+                <button onClick={() => handleDeleteGame(game.id)} className="mt-2 text-sm text-red-500">削除</button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
     </RequireAuth>
   );
 }

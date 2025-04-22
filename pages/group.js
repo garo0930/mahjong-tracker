@@ -1,70 +1,64 @@
 // pages/group.js
-
-
-
+import { useEffect, useState } from "react";
+import { db } from "../firebase";
+import { collection, addDoc } from "firebase/firestore";
 import Navbar from "../components/Navbar";
+import RequireAuth from "../components/RequireAuth";
 
-import { useState } from 'react';
-import { v4 as uuidv4 } from 'uuid';
-import { db, auth } from '../firebase';
-import { collection, addDoc } from 'firebase/firestore';
-import { onAuthStateChanged } from 'firebase/auth';
+export default function Group() {
+  const [groupName, setGroupName] = useState("");
+  const [groupId, setGroupId] = useState("");
+  const [darkMode, setDarkMode] = useState(false);
+  const [theme, setTheme] = useState("wafu");
 
-export default function GroupPage() {
-  const [groupId, setGroupId] = useState('');
-  const [user, setUser] = useState(null);
-  
+  const themeClassMap = {
+    wafu: "bg-amber-50 text-gray-900",
+    kinzoku: "bg-zinc-900 text-yellow-300",
+    chuka: "bg-yellow-50 text-red-800",
+  };
 
-  // ログイン状態の取得
-  onAuthStateChanged(auth, (currentUser) => {
-    if (currentUser && !user) setUser(currentUser);
-  });
+  useEffect(() => {
+    const storedDark = localStorage.getItem("darkMode");
+    const storedTheme = localStorage.getItem("theme");
+    if (storedDark) setDarkMode(storedDark === "true");
+    if (storedTheme) setTheme(storedTheme);
+  }, []);
 
-  const createGroup = async () => {
-    const newGroupId = uuidv4().slice(0, 8); // ランダムな短いID
-    setGroupId(newGroupId);
-
-    await addDoc(collection(db, 'groups'), {
-      groupId: newGroupId,
-      createdBy: user?.uid || 'unknown',
-      createdAt: new Date()
+  const handleCreate = async () => {
+    if (!groupName) return;
+    const docRef = await addDoc(collection(db, "groups"), {
+      name: groupName,
     });
-
-    alert(`グループを作成しました！ID: ${newGroupId}`);
+    const id = docRef.id;
+    localStorage.setItem("groupId", id);
+    setGroupId(id);
+    setGroupName("");
   };
 
   return (
-    <div className="p-6">
-      <Navbar />
-      <h1 className="text-2xl font-bold mb-4">🧑‍🤝‍🧑 グループ作成</h1>
-      <button
-        onClick={createGroup}
-        className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-      >
-        グループを作成する
-      </button>
-
-      {groupId && (
-  <div className="mt-4">
-    <p className="text-lg">あなたのグループID:</p>
-    <div className="flex items-center gap-2 mt-1">
-      <p className="font-mono text-xl text-green-600">{groupId}</p>
-      <button
-        onClick={async () => {
-          await navigator.clipboard.writeText(groupId);
-          alert("グループIDをコピーしました！");
-        }}
-        className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600"
-      >
-        コピー
-      </button>
-    </div>
-    <p className="text-sm text-gray-500 mt-2">
-      このIDを知り合いに共有してください
-    </p>
-  </div>
-)}
-
-    </div>
+    <RequireAuth>
+      <div className={darkMode ? "dark" : ""}>
+        <div className={`p-4 min-h-screen ${themeClassMap[theme]} dark:text-white`}>
+          <Navbar />
+          <h1 className="text-2xl font-bold mb-4">グループ作成</h1>
+          <div className="mb-4">
+            <input
+              type="text"
+              value={groupName}
+              onChange={(e) => setGroupName(e.target.value)}
+              placeholder="グループ名"
+              className="border px-2 py-1"
+            />
+            <button
+              onClick={handleCreate}
+              className="ml-2 bg-blue-600 text-white px-4 py-1 rounded"
+            >
+              作成
+            </button>
+          </div>
+          {groupId && <p className="text-green-600">作成されたグループID：{groupId}</p>}
+        </div>
+      </div>
+    </RequireAuth>
   );
 }
