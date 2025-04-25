@@ -31,9 +31,10 @@ export default function Games() {
 
   const themeClassMap = {
     wafu: "bg-amber-50 text-gray-900",
-    kinzoku: "bg-zinc-900 text-yellow-300",
+    kinzoku: "bg-zinc-900 text-yellow-300 dark:text-white",
     chuka: "bg-yellow-50 text-red-800",
   };
+  
 
   const cardClassMap = {
     wafu: "bg-white border-[3px] border-red-400 rounded-xl shadow-md",
@@ -166,7 +167,7 @@ export default function Games() {
   return (
     <RequireAuth>
       <div className={darkMode ? 'dark' : ''}>
-        <div className={`p-4 min-h-screen ${themeClassMap[theme]} dark:text-white`}>
+        <div className={`p-4 min-h-screen ${themeClassMap[theme]} `}>
           <Navbar />
 
           <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
