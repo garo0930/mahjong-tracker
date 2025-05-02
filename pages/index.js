@@ -1,4 +1,3 @@
-// pages/index.js
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
@@ -21,10 +20,30 @@ export default function Home() {
   }, [darkMode, theme]);
 
   const toggleDarkMode = () => setDarkMode(!darkMode);
+
   const toggleTheme = () => {
     const nextTheme = theme === "wafu" ? "kinzoku" : theme === "kinzoku" ? "chuka" : "wafu";
     setTheme(nextTheme);
   };
+ 
+  const [agreed, setAgreed] = useState(false);
+const [showAgreement, setShowAgreement] = useState(false);
+
+useEffect(() => {
+  const isAgreed = localStorage.getItem("agreedToTerms");
+  if (!isAgreed) {
+    setShowAgreement(true);
+  } else {
+    setAgreed(true);
+  }
+}, []);
+
+const handleAgree = () => {
+  localStorage.setItem("agreedToTerms", "true");
+  setAgreed(true);
+  setShowAgreement(false);
+};
+
 
   return (
     <div className={darkMode ? "dark" : ""}>
@@ -35,6 +54,7 @@ export default function Home() {
         <div className="min-h-screen px-4 py-8 bg-white/80 dark:bg-gray-900/80">
           <Navbar />
 
+          {/* 上部ボタン */}
           <div className="flex justify-end gap-2 mb-4">
             <button
               onClick={toggleDarkMode}
@@ -56,21 +76,68 @@ export default function Home() {
             </button>
           </div>
 
+          {/* 中央バナーとメニュー */}
           <div className="max-w-3xl mx-auto text-center mt-10">
             <img src="/bnaner.png" alt="麻雀対局管理バナー" className="mx-auto mb-8 w-full max-w-md" />
             <div className="grid gap-6 grid-cols-2 md:grid-cols-3">
-              <Link href="/players"><img src="/player.png" alt="プレイヤー管理" className="w-full hover:scale-105 transition" /></Link>
-              <Link href="/games"><img src="/play.png" alt="対局記録" className="w-full hover:scale-105 transition" /></Link>
-              <Link href="/analysis"><img src="/analysis.png" alt="統計・分析" className="w-full hover:scale-105 transition" /></Link>
-              <Link href="/graph"><img src="/graph.png" alt="収支グラフ" className="w-full hover:scale-105 transition" /></Link>
-              <Link href="/rank-graph"><img src="/rank.png" alt="平均順位" className="w-full hover:scale-105 transition" /></Link>
-              <Link href="/group"><img src="/newgroup.png" alt="グループ作成" className="w-full hover:scale-105 transition" /></Link>
-              <Link href="/group-join"><img src="/group.png" alt="グループに参加" className="w-full hover:scale-105 transition" /></Link>
-              <Link href="/group-status"><img src="/confirmation.png" alt="所属グループの確認" className="w-full hover:scale-105 transition" /></Link>
-              <Link href="/login"><img src="/login.png" alt="ログイン" className="w-full hover:scale-105 transition" /></Link>
+              {/* メニュー画像一覧 */}
+              <Link href="/players" className="block">
+                <img src="/player.png" alt="プレイヤー管理" className="w-32 h-24 sm:w-40 sm:h-28 object-contain mx-auto hover:scale-105 transition" />
+              </Link>
+              <Link href="/my-stats" className="block">
+                <img src="/performance.png" alt="パフォーマンスデータ" className="w-32 h-24 sm:w-40 sm:h-28 object-contain mx-auto hover:scale-105 transition" />
+              </Link>
+              <Link href="/games" className="block">
+                <img src="/play.png" alt="対局記録" className="w-32 h-24 sm:w-40 sm:h-28 object-contain mx-auto hover:scale-105 transition" />
+              </Link>
+              <Link href="/stats" className="block">
+                <img src="/analysis.png" alt="統計・分析" className="w-32 h-24 sm:w-40 sm:h-28 object-contain mx-auto hover:scale-105 transition" />
+              </Link>
+              <Link href="/graph" className="block">
+                <img src="/graph.png" alt="収支グラフ" className="w-32 h-24 sm:w-40 sm:h-28 object-contain mx-auto hover:scale-105 transition" />
+              </Link>
+              <Link href="/rank-graph" className="block">
+                <img src="/rank.png" alt="平均順位" className="w-32 h-24 sm:w-40 sm:h-28 object-contain mx-auto hover:scale-105 transition" />
+              </Link>
+              <Link href="/group" className="block">
+                <img src="/newgroup.png" alt="グループ作成" className="w-32 h-24 sm:w-40 sm:h-28 object-contain mx-auto hover:scale-105 transition" />
+              </Link>
+              <Link href="/group-join" className="block">
+                <img src="/group.png" alt="グループに参加" className="w-32 h-24 sm:w-40 sm:h-28 object-contain mx-auto hover:scale-105 transition" />
+              </Link>
+              <Link href="/group-status" className="block">
+                <img src="/confirmation.png" alt="所属グループの確認" className="w-32 h-24 sm:w-40 sm:h-28 object-contain mx-auto hover:scale-105 transition" />
+              </Link>
+              <Link href="/login" className="block">
+                <img src="/login.png" alt="ログイン" className="w-32 h-24 sm:w-40 sm:h-28 object-contain mx-auto hover:scale-105 transition" />
+              </Link>
             </div>
           </div>
+           
+          {showAgreement && (
+  <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg max-w-md w-full text-center">
+      <h2 className="text-xl font-bold mb-4">ご利用にあたって</h2>
+      <p className="mb-4 text-sm">
+        このアプリを利用するには、利用規約とプライバシーポリシーに同意していただく必要があります。
+      </p>
+      <div className="flex flex-col gap-3 mb-4">
+        <a href="/terms" className="underline text-blue-600 dark:text-blue-400 text-sm" target="_blank">📜 利用規約を読む</a>
+        <a href="/privacy" className="underline text-blue-600 dark:text-blue-400 text-sm" target="_blank">🔒 プライバシーポリシーを読む</a>
+      </div>
+      <button
+        onClick={handleAgree}
+        className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+      >
+        同意する
+      </button>
+    </div>
+  </div>
+)}
 
+
+
+          {/* 使い方ポップアップ */}
           {showInfo && (
             <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
               <div className="bg-white dark:bg-gray-800 p-6 rounded-lg max-w-md w-full text-left shadow-xl">
